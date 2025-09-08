@@ -15,9 +15,16 @@ public:
     Shape (int _vertices) {
         vertices = _vertices;
         points = new Point*[vertices+1];
+        for (int i = 0; i < vertices; ++i) {
+	    points[i] = new Point();
+	}
     }
 
     ~Shape () {
+        for (int i = 0; i < vertices; ++i) {
+	    delete points[i];
+	}
+	delete[] points;
     }
 
     void addPoints(Point* pts) {
@@ -31,8 +38,8 @@ public:
         for (int i = 0; i < vertices; i++) {
             // FIXME: there are two methods to access members of pointers
             //        use one to fix lhs and the other to fix rhs
-            int lhs = points[i]->x * points[i+1]->y;
-            int rhs = (*points[i+1]).x * (*points[i]).y;
+            int lhs = points[i]->x * points[(i+1)%vertices]->y;
+            int rhs = (*points[(i+1)%vertices]).x * (*points[i]).y;
             temp += (lhs - rhs);
         }
         double calc_area = abs(temp)/2.0;
