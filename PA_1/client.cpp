@@ -60,7 +60,7 @@ int main (int argc, char *argv[]) {
 	
 	// example data point request
     char buf[MAX_MESSAGE]; // 256
-    datamsg x(1, 0.0, 1);
+    datamsg x(p,t,e);
 	
 	memcpy(buf, &x, sizeof(datamsg));
 	chan.cwrite(buf, sizeof(datamsg)); // question
