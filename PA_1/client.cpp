@@ -27,8 +27,9 @@ int main (int argc, char *argv[]) {
 		cerr << "Pipe failed\n";
 		return 1;
 	}
+	int maxMSG = MAX_MESSAGE;
 	string filename = "";
-	while ((opt = getopt(argc, argv, "p:t:e:f:")) != -1) {
+	while ((opt = getopt(argc, argv, "p:t:e:f:m:")) != -1) {
 		switch (opt) {
 			case 'p':
 				p = atoi (optarg); //atoi is ascii to int
@@ -41,6 +42,9 @@ int main (int argc, char *argv[]) {
 				break;
 			case 'f':
 				filename = optarg;
+				break;
+			case 'm':
+				maxMSG = atoi(optarg);
 				break;
 		}
 	}
@@ -59,11 +63,11 @@ int main (int argc, char *argv[]) {
     FIFORequestChannel chan("control", FIFORequestChannel::CLIENT_SIDE);
 	
 	// example data point request
-    char buf[MAX_MESSAGE]; // 256
+    char* buf1 = new char[maxMSG]; 
     datamsg x(p,t,e);
 	
-	memcpy(buf, &x, sizeof(datamsg));
-	chan.cwrite(buf, sizeof(datamsg)); // question
+	memcpy(buf1, &x, sizeof(datamsg));
+	chan.cwrite(buf1, sizeof(datamsg)); // question
 	double reply;
 	chan.cread(&reply, sizeof(double)); //answer
 	cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
@@ -71,7 +75,7 @@ int main (int argc, char *argv[]) {
     // sending a non-sense message, you need to change this
 	filemsg fm(0, 0);
 	string fname = "teslkansdlkjflasjdf.dat";
-	
+	//4.3 below
 	int len = sizeof(filemsg) + (fname.size() + 1);
 	char* buf2 = new char[len];
 	memcpy(buf2, &fm, sizeof(filemsg));
@@ -79,7 +83,7 @@ int main (int argc, char *argv[]) {
 	chan.cwrite(buf2, len);  // I want the file length;
 
 	delete[] buf2;
-	
+	delete[] buf1;
 	// closing the channel    
     MESSAGE_TYPE m = QUIT_MSG;
     chan.cwrite(&m, sizeof(MESSAGE_TYPE));
