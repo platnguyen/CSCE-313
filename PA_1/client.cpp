@@ -26,7 +26,7 @@ int main (int argc, char *argv[]) {
 	bool new_channel_flag = false;
 	bool new_buff_flag = false;
 	char* new_buff;
-	int maxMSG = MAX_MESSAGE;
+//	int maxMSG = MAX_MESSAGE;
 	string filename = "";
 	while ((opt = getopt(argc, argv, "p:t:e:f:m:c:")) != -1) {
 		switch (opt) {
@@ -45,7 +45,7 @@ int main (int argc, char *argv[]) {
 				file_flag = true;
 				break;
 			case 'm':
-				maxMSG = atoi(optarg);
+//				maxMSG = atoi(optarg);
 				new_buff_flag = true;
 				new_buff = optarg;
 				break;
@@ -64,8 +64,8 @@ int main (int argc, char *argv[]) {
 			char* arg[] = {(char*)"./server", (char*)"-m", new_buff, NULL};
 			execvp(arg[0], arg);
 		}else {
-	    	char* arg[] = {(char*)"./server", NULL};
-		execvp(arg[0], arg);
+		    	char* arg[] = {(char*)"./server", NULL};
+			execvp(arg[0], arg);
 		}
 	}
 
@@ -82,18 +82,14 @@ int main (int argc, char *argv[]) {
 			thousand_points << ret << endl;
 		}
 		thousand_points.close();
-	}
+	}else if (time_flag == true || (file_flag == false && new_channel_flag == false)) {
 
- 
-	// example data point request
-    char* buf1 = new char[maxMSG]; 
-    datamsg x(p,t,e);
-	
-	memcpy(buf1, &x, sizeof(datamsg));
-	chan.cwrite(buf1, sizeof(datamsg)); // question
-	double reply;
-	chan.cread(&reply, sizeof(double)); //answer
-	cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
+		datamsg x(p,t,e);
+		chan.cwrite(&x, sizeof(datamsg));
+		double reply; 
+		chan.cread(&reply, sizeof(double));
+		cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
+	}
 	
     // sending a non-sense message, you need to change this
 	filemsg fm(0, 0);
@@ -106,7 +102,7 @@ int main (int argc, char *argv[]) {
 	chan.cwrite(buf2, len);  // I want the file length;
 
 	delete[] buf2;
-	delete[] buf1;
+	
 	// closing the channel    
     MESSAGE_TYPE m = QUIT_MSG;
     chan.cwrite(&m, sizeof(MESSAGE_TYPE));
