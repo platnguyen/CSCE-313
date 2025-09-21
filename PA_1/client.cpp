@@ -73,17 +73,24 @@ int main (int argc, char *argv[]) {
 	
 	if (time_flag == false && new_channel_flag == false && file_flag == false) {
 		ofstream thousand_points;
-		thousand_points.open("x1.csv");
+		thousand_points.open("received/x1.csv");
 		for (double t = 0; t < 4; t += 0.004) {
-			datamsg d(p, t, e);
+			thousand_points << t << ",";
+			datamsg d(p, t, 1);
 			chan.cwrite(&d, sizeof(datamsg));
 			double ret;
 			chan.cread(&ret, sizeof(double));
-			thousand_points << ret << endl;
+			thousand_points << ret << ",";
+			datamsg d2(p, t, 2);
+			chan.cwrite(&d2, sizeof(datamsg));
+			double ret2;
+			chan.cread(&ret2, sizeof(double));
+			thousand_points << ret2 << endl;
+
 		}
 		thousand_points.close();
 	}else if (time_flag == true || (file_flag == false && new_channel_flag == false)) {
-
+		
 		datamsg x(p,t,e);
 		chan.cwrite(&x, sizeof(datamsg));
 		double reply; 
