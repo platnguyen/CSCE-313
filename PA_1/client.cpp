@@ -14,6 +14,7 @@
 #include "FIFORequestChannel.h"
 #include <unistd.h>
 #include <sys/time.h>
+#include <iomanip>
 using namespace std;
 
 
@@ -99,55 +100,54 @@ int main (int argc, char *argv[]) {
 		chan.cread(&reply, sizeof(double));
 		cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
 	}else if (time_flag == false && file_flag == true) {
+		//Create the request messege to get file size
 		filemsg f(0, 0);
 		int file_len = sizeof(filemsg) + strlen(filename) + 1;
 		char* buf = new char[file_len];
 		memcpy(buf, &f, sizeof(filemsg));
 		strcpy(buf + sizeof(filemsg), filename);
+		//Send the size request and read the response
 		chan.cwrite(buf, file_len);
 		__int64_t fs;
 		chan.cread(&fs, sizeof(__int64_t));
-		int num_msgs = ceil(double(fs)/maxMSG);
-		filemsg* fm = (filemsg*) buf;
-		if (num_msgs == 1){
-			fm->offset = 0;
-			fm->length = fs;
-		} else {
-			fm->length = maxMSG;
-			fm->offset = 0;
-		}
-		__int64_t lastCount = fs - maxMSG* (num_msgs-1);
-		chan.cwrite(buf, file_len);
-		char* ret_buffer = new char[maxMSG];
-		chan.cread(ret_buffer,maxMSG);
+
 		string outputFilePath = string("received/") + string(filename);
 		FILE* fp = fopen(outputFilePath.c_str(), "wb");
-		fwrite(ret_buffer, 1, fm->length, fp);
-
+		if (!fp) {
+			cerr << "Failed to open output file. \n";
+		}
+		char* ret_buffer = new char[maxMSG];
+		__int64_t received_so_far = 0;
 
 		struct timeval start, end;
 		gettimeofday(&start, NULL);
-		for (int i = 1; i < num_msgs; i++){
-			if (i == num_msgs-1){
-				fm->length = lastCount;
-				ret_buffer = new char[lastCount];
-				fm->offset += maxMSG;
-				chan.cwrite(buf, file_len);
-				chan.cread(ret_buffer,maxMSG);
-				fwrite(ret_buffer, 1, fm->length, fp);
-			}else{
-				fm->offset += maxMSG;
-				chan.cwrite(buf, file_len);
-				chan.cread(ret_buffer, maxMSG);
-				fwrite(ret_buffer, 1, fm->length, fp);
+		filemsg* fm = (filemsg*) buf;
+		while (received_so_far < fs){
+		
+			fm->offset = received_so_far;
+			__int64_t remainingBytes = fs - received_so_far;
+			if (remainingBytes < maxMSG) {
+				fm->length = remainingBytes;
+			}else {
+				fm->length = maxMSG;
 			}
 		}
+		chan.cwrite(buf, file_len);
+		chan.cread(ret_buffer, fm->length);
+		fwrite(ret_buffer, 1, fm->length, fp);
+		received_so_far += fm->length;
 		gettimeofday(&end, NULL);
-		double time_taken;
-		time_taken = (end.tv_sec - start.tv_sec) * 1e6;
-		time_taken = (time_taken + (end.tv_usec - start.tv_usec)) + 1e-6;
+		fclose(fp);
+
+		double timeTaken;
+		timeTaken = (end.tv_sec - start.tv_sec) * 1e6;
+		timeTaken = (timeTaken + (end.tv_usec - start.tv_usec)) * 1e-6;
+		cout << "File transfer completed." << endl;
+		cout << "Time taken by program is : " << fixed << timeTaken << setprecision(6);
+		cout << " sec" << endl;
 		delete [] ret_buffer;
 		delete [] buf;
+		
 	}
     
 	// closing the channel    
