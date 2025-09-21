@@ -21,30 +21,36 @@ int main (int argc, char *argv[]) {
 	int p = 1;
 	double t = 0.0;
 	int e = 1;
-	//Create pipe and check for error
-	int fd[2];
-	if (pipe(fd) == -1) {
-		cerr << "Pipe failed\n";
-		return 1;
-	}
+	bool time_flag = false;
+	bool file_flag = false;
+	bool new_channel_flag = false;
+	bool new_buff_flag = false;
+	char* new_buff;
 	int maxMSG = MAX_MESSAGE;
 	string filename = "";
-	while ((opt = getopt(argc, argv, "p:t:e:f:m:")) != -1) {
+	while ((opt = getopt(argc, argv, "p:t:e:f:m:c:")) != -1) {
 		switch (opt) {
 			case 'p':
 				p = atoi (optarg); //atoi is ascii to int
 				break;
 			case 't':
 				t = atof (optarg); //atof is ascii to float
+				time_flag = true;
 				break;
 			case 'e':
 				e = atoi (optarg);
 				break;
 			case 'f':
 				filename = optarg;
+				file_flag = true;
 				break;
 			case 'm':
 				maxMSG = atoi(optarg);
+				new_buff_flag = true;
+				new_buff = optarg;
+				break;
+			case 'c':
+				new_channel_flag = true;
 				break;
 		}
 	}
@@ -54,14 +60,31 @@ int main (int argc, char *argv[]) {
 	cerr << "fork failed\n";
 	}
 	if (id ==0) {
+		if (new_buff_flag) {
+			char* arg[] = {(char*)"./server", (char*)"-m", new_buff, NULL};
+			execvp(arg[0], arg);
+		}else {
 	    	char* arg[] = {(char*)"./server", NULL};
 		execvp(arg[0], arg);
-		close(fd[0]);
-		close(fd[1]);
+		}
 	}
 
     FIFORequestChannel chan("control", FIFORequestChannel::CLIENT_SIDE);
 	
+	if (time_flag == false && new_channel_flag == false && file_flag == false) {
+		ofstream thousand_points;
+		thousand_points.open("x1.csv");
+		for (double t = 0; t < 4; t += 0.004) {
+			datamsg d(p, t, e);
+			chan.cwrite(&d, sizeof(datamsg));
+			double ret;
+			chan.cread(&ret, sizeof(double));
+			thousand_points << ret << endl;
+		}
+		thousand_points.close();
+	}
+
+ 
 	// example data point request
     char* buf1 = new char[maxMSG]; 
     datamsg x(p,t,e);
