@@ -13,6 +13,7 @@
 #include "common.h"
 #include "FIFORequestChannel.h"
 #include <unistd.h>
+#include <sys/time.h>
 using namespace std;
 
 
@@ -26,8 +27,8 @@ int main (int argc, char *argv[]) {
 	bool new_channel_flag = false;
 	bool new_buff_flag = false;
 	char* new_buff;
-//	int maxMSG = MAX_MESSAGE;
-	string filename = "";
+	int maxMSG = MAX_MESSAGE;
+	char* filename;
 	while ((opt = getopt(argc, argv, "p:t:e:f:m:c:")) != -1) {
 		switch (opt) {
 			case 'p':
@@ -45,7 +46,7 @@ int main (int argc, char *argv[]) {
 				file_flag = true;
 				break;
 			case 'm':
-//				maxMSG = atoi(optarg);
+				maxMSG = atoi(optarg);
 				new_buff_flag = true;
 				new_buff = optarg;
 				break;
@@ -72,6 +73,7 @@ int main (int argc, char *argv[]) {
     FIFORequestChannel chan("control", FIFORequestChannel::CLIENT_SIDE);
 	
 	if (time_flag == false && new_channel_flag == false && file_flag == false) {
+		//To get 1000 points of data for a patient
 		ofstream thousand_points;
 		thousand_points.open("received/x1.csv");
 		for (double t = 0; t < 4; t += 0.004) {
@@ -90,26 +92,64 @@ int main (int argc, char *argv[]) {
 		}
 		thousand_points.close();
 	}else if (time_flag == true || (file_flag == false && new_channel_flag == false)) {
-		
+		//For only one data point
 		datamsg x(p,t,e);
 		chan.cwrite(&x, sizeof(datamsg));
 		double reply; 
 		chan.cread(&reply, sizeof(double));
 		cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
-	}
-	
-    // sending a non-sense message, you need to change this
-	filemsg fm(0, 0);
-	string fname = "teslkansdlkjflasjdf.dat";
-	//4.3 below
-	int len = sizeof(filemsg) + (fname.size() + 1);
-	char* buf2 = new char[len];
-	memcpy(buf2, &fm, sizeof(filemsg));
-	strcpy(buf2 + sizeof(filemsg), fname.c_str());
-	chan.cwrite(buf2, len);  // I want the file length;
+	}else if (time_flag == false && file_flag == true) {
+		filemsg f(0, 0);
+		int file_len = sizeof(filemsg) + strlen(filename) + 1;
+		char* buf = new char[file_len];
+		memcpy(buf, &f, sizeof(filemsg));
+		strcpy(buf + sizeof(filemsg), filename);
+		chan.cwrite(buf, file_len);
+		__int64_t fs;
+		chan.cread(&fs, sizeof(__int64_t));
+		int num_msgs = ceil(double(fs)/maxMSG);
+		filemsg* fm = (filemsg*) buf;
+		if (num_msgs == 1){
+			fm->offset = 0;
+			fm->length = fs;
+		} else {
+			fm->length = maxMSG;
+			fm->offset = 0;
+		}
+		__int64_t lastCount = fs - maxMSG* (num_msgs-1);
+		chan.cwrite(buf, file_len);
+		char* ret_buffer = new char[maxMSG];
+		chan.cread(ret_buffer,maxMSG);
+		string outputFilePath = string("received/") + string(filename);
+		FILE* fp = fopen(outputFilePath.c_str(), "wb");
+		fwrite(ret_buffer, 1, fm->length, fp);
 
-	delete[] buf2;
-	
+
+		struct timeval start, end;
+		gettimeofday(&start, NULL);
+		for (int i = 1; i < num_msgs; i++){
+			if (i == num_msgs-1){
+				fm->length = lastCount;
+				ret_buffer = new char[lastCount];
+				fm->offset += maxMSG;
+				chan.cwrite(buf, file_len);
+				chan.cread(ret_buffer,maxMSG);
+				fwrite(ret_buffer, 1, fm->length, fp);
+			}else{
+				fm->offset += maxMSG;
+				chan.cwrite(buf, file_len);
+				chan.cread(ret_buffer, maxMSG);
+				fwrite(ret_buffer, 1, fm->length, fp);
+			}
+		}
+		gettimeofday(&end, NULL);
+		double time_taken;
+		time_taken = (end.tv_sec - start.tv_sec) * 1e6;
+		time_taken = (time_taken + (end.tv_usec - start.tv_usec)) + 1e-6;
+		delete [] ret_buffer;
+		delete [] buf;
+	}
+    
 	// closing the channel    
     MESSAGE_TYPE m = QUIT_MSG;
     chan.cwrite(&m, sizeof(MESSAGE_TYPE));
