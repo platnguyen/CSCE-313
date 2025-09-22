@@ -123,7 +123,6 @@ int main (int argc, char *argv[]) {
 		gettimeofday(&start, NULL);
 		filemsg* fm = (filemsg*) buf;
 		while (received_so_far < fs){
-		
 			fm->offset = received_so_far;
 			__int64_t remainingBytes = fs - received_so_far;
 			if (remainingBytes < maxMSG) {
@@ -131,11 +130,12 @@ int main (int argc, char *argv[]) {
 			}else {
 				fm->length = maxMSG;
 			}
-		}
+		
 		chan.cwrite(buf, file_len);
 		chan.cread(ret_buffer, fm->length);
 		fwrite(ret_buffer, 1, fm->length, fp);
 		received_so_far += fm->length;
+		}
 		gettimeofday(&end, NULL);
 		fclose(fp);
 
@@ -156,3 +156,4 @@ int main (int argc, char *argv[]) {
 
 	
 }
+
