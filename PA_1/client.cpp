@@ -71,8 +71,17 @@ int main (int argc, char *argv[]) {
 		}
 	}
 
-    FIFORequestChannel chan("control", FIFORequestChannel::CLIENT_SIDE);
-	
+	FIFORequestChannel chan("control", FIFORequestChannel::CLIENT_SIDE);
+	FIFORequestChannel* newChan = &chan;
+	if (new_channel_flag) {
+		MESSAGE_TYPE new_chan = NEWCHANNEL_MSG;
+		chan.cwrite(&new_chan, sizeof(MESSAGE_TYPE));
+		char newChannelName[100];
+		chan.cread(&new_chan, sizeof(newChannelName));
+		newChan = new FIFORequestChannel(newChannelName, FIFORequestChannel::CLIENT_SIDE);
+	}
+
+
 	if (time_flag == false && new_channel_flag == false && file_flag == false) {
 		//To get 1000 points of data for a patient
 		ofstream thousand_points;
@@ -80,14 +89,14 @@ int main (int argc, char *argv[]) {
 		for (double t = 0; t < 4; t += 0.004) {
 			thousand_points << t << ",";
 			datamsg d(p, t, 1);
-			chan.cwrite(&d, sizeof(datamsg));
+			newChan->cwrite(&d, sizeof(datamsg));
 			double ret;
-			chan.cread(&ret, sizeof(double));
+			newChan->cread(&ret, sizeof(double));
 			thousand_points << ret << ",";
 			datamsg d2(p, t, 2);
-			chan.cwrite(&d2, sizeof(datamsg));
+			newChan->cwrite(&d2, sizeof(datamsg));
 			double ret2;
-			chan.cread(&ret2, sizeof(double));
+			newChan->cread(&ret2, sizeof(double));
 			thousand_points << ret2 << endl;
 
 		}
@@ -95,9 +104,9 @@ int main (int argc, char *argv[]) {
 	}else if (time_flag == true || (file_flag == false && new_channel_flag == false)) {
 		//For only one data point
 		datamsg x(p,t,e);
-		chan.cwrite(&x, sizeof(datamsg));
+		newChan->cwrite(&x, sizeof(datamsg));
 		double reply; 
-		chan.cread(&reply, sizeof(double));
+		newChan->cread(&reply, sizeof(double));
 		cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
 	}else if (time_flag == false && file_flag == true) {
 		//Create the request messege to get file size
@@ -107,9 +116,9 @@ int main (int argc, char *argv[]) {
 		memcpy(buf, &f, sizeof(filemsg));
 		strcpy(buf + sizeof(filemsg), filename);
 		//Send the size request and read the response
-		chan.cwrite(buf, file_len);
+		newChan->cwrite(buf, file_len);
 		__int64_t fs;
-		chan.cread(&fs, sizeof(__int64_t));
+		newChan->cread(&fs, sizeof(__int64_t));
 
 		string outputFilePath = string("received/") + string(filename);
 		FILE* fp = fopen(outputFilePath.c_str(), "wb");
@@ -131,8 +140,8 @@ int main (int argc, char *argv[]) {
 				fm->length = maxMSG;
 			}
 		
-		chan.cwrite(buf, file_len);
-		chan.cread(ret_buffer, fm->length);
+		newChan->cwrite(buf, file_len);
+		newChan->cread(ret_buffer, fm->length);
 		fwrite(ret_buffer, 1, fm->length, fp);
 		received_so_far += fm->length;
 		}
@@ -149,11 +158,14 @@ int main (int argc, char *argv[]) {
 		delete [] buf;
 		
 	}
-    
-	// closing the channel    
-    MESSAGE_TYPE m = QUIT_MSG;
-    chan.cwrite(&m, sizeof(MESSAGE_TYPE));
-
 	
+	// closing the channel    
+	MESSAGE_TYPE m = QUIT_MSG;
+	newChan->cwrite(&m, sizeof(MESSAGE_TYPE));
+	if (new_channel_flag) {
+		delete newChan;
+	}
+
 }
 
+	
