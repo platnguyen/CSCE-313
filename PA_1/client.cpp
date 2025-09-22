@@ -30,7 +30,7 @@ int main (int argc, char *argv[]) {
 	char* new_buff;
 	int maxMSG = MAX_MESSAGE;
 	char* filename;
-	while ((opt = getopt(argc, argv, "p:t:e:f:m:c:")) != -1) {
+	while ((opt = getopt(argc, argv, "p:t:e:f:m:c")) != -1) {
 		switch (opt) {
 			case 'p':
 				p = atoi (optarg); //atoi is ascii to int
@@ -81,34 +81,7 @@ int main (int argc, char *argv[]) {
 		newChan = new FIFORequestChannel(newChannelName, FIFORequestChannel::CLIENT_SIDE);
 	}
 
-
-	if (time_flag == false && new_channel_flag == false && file_flag == false) {
-		//To get 1000 points of data for a patient
-		ofstream thousand_points;
-		thousand_points.open("received/x1.csv");
-		for (double t = 0; t < 4; t += 0.004) {
-			thousand_points << t << ",";
-			datamsg d(p, t, 1);
-			newChan->cwrite(&d, sizeof(datamsg));
-			double ret;
-			newChan->cread(&ret, sizeof(double));
-			thousand_points << ret << ",";
-			datamsg d2(p, t, 2);
-			newChan->cwrite(&d2, sizeof(datamsg));
-			double ret2;
-			newChan->cread(&ret2, sizeof(double));
-			thousand_points << ret2 << endl;
-
-		}
-		thousand_points.close();
-	}else if (time_flag == true || (file_flag == false && new_channel_flag == false)) {
-		//For only one data point
-		datamsg x(p,t,e);
-		newChan->cwrite(&x, sizeof(datamsg));
-		double reply; 
-		newChan->cread(&reply, sizeof(double));
-		cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
-	}else if (time_flag == false && file_flag == true) {
+	if (file_flag) {
 		//Create the request messege to get file size
 		filemsg f(0, 0);
 		int file_len = sizeof(filemsg) + strlen(filename) + 1;
@@ -157,6 +130,31 @@ int main (int argc, char *argv[]) {
 		delete [] ret_buffer;
 		delete [] buf;
 		
+	}else if (time_flag) {
+		//For only one data point
+		datamsg x(p,t,e);
+		newChan->cwrite(&x, sizeof(datamsg));
+		double reply; 
+		newChan->cread(&reply, sizeof(double));
+		cout << "For person " << p << ", at time " << t << ", the value of ecg " << e << " is " << reply << endl;
+	}else {
+		//To get 1000 points of data for a patient
+		ofstream thousand_points;
+		thousand_points.open("received/x1.csv");
+		for (double t = 0; t < 4; t += 0.004) {
+			thousand_points << t << ",";
+			datamsg d(p, t, 1);
+			newChan->cwrite(&d, sizeof(datamsg));
+			double ret;
+			newChan->cread(&ret, sizeof(double));
+			thousand_points << ret << ",";
+			datamsg d2(p, t, 2);
+			newChan->cwrite(&d2, sizeof(datamsg));
+			double ret2;
+			newChan->cread(&ret2, sizeof(double));
+			thousand_points << ret2 << endl;
+		}
+		thousand_points.close();
 	}
 	
 	// closing the channel    
@@ -170,5 +168,3 @@ int main (int argc, char *argv[]) {
 	chan.cwrite(&m, sizeof(MESSAGE_TYPE));
 
 }
-
-	
