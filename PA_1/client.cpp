@@ -72,13 +72,13 @@ int main (int argc, char *argv[]) {
 	}
 
 	FIFORequestChannel chan("control", FIFORequestChannel::CLIENT_SIDE);
-	FIFORequestChannel* newChan = &chan;
-	if (new_channel_flag) {
+	FIFORequestChannel* newChan = &chan; //newChan object in case the user wants to make a new channel, for now will just be chan
+	if (new_channel_flag) { //if user wants a new channel...
 		MESSAGE_TYPE new_chan = NEWCHANNEL_MSG;
 		chan.cwrite(&new_chan, sizeof(MESSAGE_TYPE));
 		char newChannelName[100];
 		chan.cread(newChannelName, sizeof(newChannelName));
-		newChan = new FIFORequestChannel(newChannelName, FIFORequestChannel::CLIENT_SIDE);
+		newChan = new FIFORequestChannel(newChannelName, FIFORequestChannel::CLIENT_SIDE); //actually creating new channel w/ new name
 	}
 
 	if (file_flag) {
@@ -93,44 +93,50 @@ int main (int argc, char *argv[]) {
 		__int64_t fs;
 		newChan->cread(&fs, sizeof(__int64_t));
 
+		//To open a copy in the received directory
 		string outputFilePath = string("received/") + string(filename);
 		FILE* fp = fopen(outputFilePath.c_str(), "wb");
 		if (!fp) {
 			cerr << "Failed to open output file. \n";
 		}
-		char* ret_buffer = new char[maxMSG];
-		__int64_t received_so_far = 0;
+		char* ret_buffer = new char[maxMSG]; //set our buffer to either the default max buffer or a new one
 
+		__int64_t received_so_far = 0; //To track how many more bytes we need to go, this will be compared to file size (fs)
+		//gets the time when we start copying/receiving all the data
 		struct timeval start, end;
 		gettimeofday(&start, NULL);
 		filemsg* fm = (filemsg*) buf;
+
 		while (received_so_far < fs){
-			fm->offset = received_so_far;
+			//does calculations to determine how much more we need to go
+			fm->offset = received_so_far; 
 			__int64_t remainingBytes = fs - received_so_far;
 			if (remainingBytes < maxMSG) {
 				fm->length = remainingBytes;
 			}else {
 				fm->length = maxMSG;
 			}
-		
+		//does the actual writing of information into our new file
 		newChan->cwrite(buf, file_len);
 		newChan->cread(ret_buffer, fm->length);
 		fwrite(ret_buffer, 1, fm->length, fp);
 		received_so_far += fm->length;
 		}
-		gettimeofday(&end, NULL);
+
+		gettimeofday(&end, NULL); //end our time tracking
 		fclose(fp);
 
 		double timeTaken;
-		timeTaken = (end.tv_sec - start.tv_sec) * 1e6;
-		timeTaken = (timeTaken + (end.tv_usec - start.tv_usec)) * 1e-6;
+		timeTaken = (end.tv_sec - start.tv_sec) * 1e6; //converts the whole seconds elapsed found start to end into microseconds
+		timeTaken = (timeTaken + (end.tv_usec - start.tv_usec)) * 1e-6; //combines the microseconds found above with the
+																		// microseconds from above and converts back to seconds
 		cout << "File transfer completed." << endl;
-		cout << "Time taken by program is : " << fixed << timeTaken << setprecision(6);
+		cout << "Time taken by program is : " << fixed << timeTaken << setprecision(6); //outputs the amount of time taken with microsecond precision
 		cout << " sec" << endl;
 		delete [] ret_buffer;
 		delete [] buf;
 		
-	}else if (time_flag) {
+	}else if (time_flag) { //if we have a time flag, usually a patient and ecg # come too, but we do have default values if only time is given
 		//For only one data point
 		datamsg x(p,t,e);
 		newChan->cwrite(&x, sizeof(datamsg));
@@ -142,29 +148,29 @@ int main (int argc, char *argv[]) {
 		ofstream thousand_points;
 		thousand_points.open("received/x1.csv");
 		for (double t = 0; t < 4; t += 0.004) {
-			thousand_points << t << ",";
+			thousand_points << t << ",";  //puts time into our stream
 			datamsg d(p, t, 1);
 			newChan->cwrite(&d, sizeof(datamsg));
 			double ret;
 			newChan->cread(&ret, sizeof(double));
-			thousand_points << ret << ",";
+			thousand_points << ret << ","; //puts ecg 1
 			datamsg d2(p, t, 2);
 			newChan->cwrite(&d2, sizeof(datamsg));
 			double ret2;
 			newChan->cread(&ret2, sizeof(double));
-			thousand_points << ret2 << endl;
+			thousand_points << ret2 << endl; //puts ecg 2
 		}
 		thousand_points.close();
 	}
 	
 	// closing the channel    
 	
-	if (new_channel_flag) {
+	if (new_channel_flag) { //Close the temp channel we made first
 		MESSAGE_TYPE mNew = QUIT_MSG;
 		newChan->cwrite(&mNew, sizeof(MESSAGE_TYPE));
 		delete newChan;
 	}
-	MESSAGE_TYPE m = QUIT_MSG;
+	MESSAGE_TYPE m = QUIT_MSG; //Closing the original channel just in case
 	chan.cwrite(&m, sizeof(MESSAGE_TYPE));
 
 }
