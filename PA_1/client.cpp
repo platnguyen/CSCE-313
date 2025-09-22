@@ -77,7 +77,7 @@ int main (int argc, char *argv[]) {
 		MESSAGE_TYPE new_chan = NEWCHANNEL_MSG;
 		chan.cwrite(&new_chan, sizeof(MESSAGE_TYPE));
 		char newChannelName[100];
-		chan.cread(&new_chan, sizeof(newChannelName));
+		chan.cread(newChannelName, sizeof(newChannelName));
 		newChan = new FIFORequestChannel(newChannelName, FIFORequestChannel::CLIENT_SIDE);
 	}
 
@@ -160,11 +160,14 @@ int main (int argc, char *argv[]) {
 	}
 	
 	// closing the channel    
-	MESSAGE_TYPE m = QUIT_MSG;
-	newChan->cwrite(&m, sizeof(MESSAGE_TYPE));
+	
 	if (new_channel_flag) {
+		MESSAGE_TYPE mNew = QUIT_MSG;
+		newChan->cwrite(&mNew, sizeof(MESSAGE_TYPE));
 		delete newChan;
 	}
+	MESSAGE_TYPE m = QUIT_MSG;
+	chan.cwrite(&m, sizeof(MESSAGE_TYPE));
 
 }
 
