@@ -1,8 +1,8 @@
 #include <threading.h>
 #include <ucontext.h>
 #include <stdio.h>
-struct worker_context contexts[NUM_CTX];
-uint8_t current_context_idx;
+//struct worker_context contexts[NUM_CTX];
+//uint8_t current_context_idx;
 
 //To manage the stack for each context
 static char* context_stacks[NUM_CTX];
@@ -21,8 +21,9 @@ void t_init()
 
 int32_t t_create(fptr foo, int32_t arg1, int32_t arg2)
 {
-	int new_index = -1;
-	for (int i = 1; i < NUM_CTX; i++) {
+	volatile int new_index = -1;
+
+	for (volatile int i = 1; i < NUM_CTX; i++) {
 		if (contexts[i].state == INVALID || contexts[i].state == DONE) {
 			new_index = i;
 			break;
@@ -64,7 +65,7 @@ int32_t t_yield()
 	for (int i = 0; i < NUM_CTX; i++) {
 		int index = (search_start_pos + i) % NUM_CTX; //do this to be able to loop to start
 		if (contexts[index].state == VALID) {
-			next_index = index;
+			next_index = (uint8_t)index;
 			break;
 		}
 	}
@@ -73,7 +74,7 @@ int32_t t_yield()
 	}
 	//do the switch
 	uint8_t old_context_index = current_context_idx;
-	current_context_idx = next_index;
+	current_context_idx = (uint8_t)next_index;
 	swapcontext(&contexts[old_context_index].context, &contexts[current_context_idx].context);
 	//figure out how many other valid contexts are there left
 	int32_t valid_count = 0;
@@ -106,7 +107,7 @@ void t_finish()
 		exit(0);
 	}
 	//switch to the current context. we are done here.
-	current_context_idx = next_index;
+	current_context_idx = (uint8_t)next_index;
 	setcontext(&contexts[current_context_idx].context);
 
 }
