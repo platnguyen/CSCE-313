@@ -38,44 +38,36 @@ int main () {
         if (tknr.hasError()) {  // continue to next prompt if input had an error
             continue;
         }
+        if (tknr.commands.empty()) { //check if there's any commands
+                continue;
+            }
 
-        // // print out every command token-by-token on individual lines
-        // // prints to cerr to avoid influencing autograder
-        // for (auto cmd : tknr.commands) {
-        //     for (auto str : cmd->args) {
-        //         cerr << "|" << str << "| ";
-        //     }
-        //     if (cmd->hasInput()) {
-        //         cerr << "in< " << cmd->in_file << " ";
-        //     }
-        //     if (cmd->hasOutput()) {
-        //         cerr << "out> " << cmd->out_file << " ";
-        //     }
-        //     cerr << endl;
-        // }
-
-        // fork to create child
-        pid_t pid = fork();
-        if (pid < 0) {  // error check
-            perror("fork");
-            exit(2);
-        }
-
-        if (pid == 0) {  // if child, exec to run command
-            // run single commands with no arguments
-            char* args[] = {(char*) tknr.commands.at(0)->args.at(0).c_str(), nullptr};
-
-            if (execvp(args[0], args) < 0) {  // error check
-                perror("execvp");
+        for (auto& cmd : tknr.commands) { //loops through all commands
+            std::vector<char*> args; //argument 
+            for (const std::string& s : cmd->args) {
+                args.push_back(const_cast<char*>(s.c_str()));
+            }
+            args.push_back(nullptr);
+            pid_t pid = fork();
+            if (pid < 0) {  // error check
+                perror("fork");
                 exit(2);
             }
-        }
-        else {  // if parent, wait for child to finish
-            int status = 0;
-            waitpid(pid, &status, 0);
-            if (status > 1) {  // exit if child didn't exec properly
-                exit(status);
+
+            if (pid == 0) {  // if child, exec to run command
+                
+                if (execvp(args[0], args.data()) < 0) {  // error check
+                    perror("execvp");
+                    exit(2);
+                }
+            }
+            else {  // if parent, wait for child to finish
+               
+		int status = 0;
+		waitpid(pid, &status, 0);
             }
         }
+
     }
+
 }
