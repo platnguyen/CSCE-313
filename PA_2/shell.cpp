@@ -23,7 +23,7 @@ int main () {
     for (;;) {
         // need date/time, username, and absolute path to current dir
         cout << YELLOW << "Shell$" << NC << " ";
-        
+
         // get user inputted command
         string input;
         getline(cin, input);
@@ -42,12 +42,22 @@ int main () {
                 continue;
             }
 
+	int fd[2]; //file descriptor for pipe
+
+	if (pipe(fd) == -1) { //create Pipe
+		cerr << "Pipe failed\n";
+		return 1;
+	}
+
+
+
+
         for (auto& cmd : tknr.commands) { //loops through all commands
-            std::vector<char*> args; //argument 
-            for (const std::string& s : cmd->args) {
-                args.push_back(const_cast<char*>(s.c_str()));
+            std::vector<char*> args; //argument storage
+            for (const std::string& s : cmd->args) { //for every string in args in cmd
+                args.push_back(const_cast<char*>(s.c_str())); //push back in our args vector
             }
-            args.push_back(nullptr);
+            args.push_back(nullptr); //after everything pushed into the vector, add a nullptr to the end
             pid_t pid = fork();
             if (pid < 0) {  // error check
                 perror("fork");
@@ -55,14 +65,14 @@ int main () {
             }
 
             if (pid == 0) {  // if child, exec to run command
-                
+
                 if (execvp(args[0], args.data()) < 0) {  // error check
                     perror("execvp");
                     exit(2);
                 }
             }
             else {  // if parent, wait for child to finish
-               
+
 		int status = 0;
 		waitpid(pid, &status, 0);
             }
