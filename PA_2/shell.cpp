@@ -40,44 +40,56 @@ int main () {
         }
         if (tknr.commands.empty()) { //check if there's any commands
                 continue;
-            }
+        }
+        int number_cmds = tknr.commands.size();
+        std::vector<pid_t> child_pids;
 
-	int fd[2]; //file descriptor for pipe
+        std::vector<int[2]> pipes(number_cmds - 1); // create a vector of pipes
 
-	if (pipe(fd) == -1) { //create Pipe
-		cerr << "Pipe failed\n";
-		return 1;
-	}
-
-
-
-
-        for (auto& cmd : tknr.commands) { //loops through all commands
-            std::vector<char*> args; //argument storage
-            for (const std::string& s : cmd->args) { //for every string in args in cmd
-                args.push_back(const_cast<char*>(s.c_str())); //push back in our args vector
-            }
-            args.push_back(nullptr); //after everything pushed into the vector, add a nullptr to the end
-            pid_t pid = fork();
-            if (pid < 0) {  // error check
-                perror("fork");
-                exit(2);
-            }
-
-            if (pid == 0) {  // if child, exec to run command
-
-                if (execvp(args[0], args.data()) < 0) {  // error check
-                    perror("execvp");
-                    exit(2);
-                }
-            }
-            else {  // if parent, wait for child to finish
-
-		int status = 0;
-		waitpid(pid, &status, 0);
+        for (int i = 0; i < number_cmds - 1; ++i) {
+            if (pipe(pipes[i]) < 0) {
+                perror("Pipe failed");
+                exit(1);
             }
         }
-
+        for (int i = 0; i < number_cmds; ++i) { // for every command, we make a vector of arguments for it
+            std::vector<char*> args;
+            for (const std::string& s : tknr.commands[i]->args) { //this actually propagates the args vector
+                args.push_back(const_cast<char*>(s.c_str()));
+            }
+            args.push_back(nullptr); // add a nullptr to the end
+            pid_t pid = fork();
+            if (pid < 0) {
+                perror("Fork failed");
+                exit(1);
+            }
+            if (pid == 0) { //child?
+                if (i > 0) { // if it isnt the very first command then we connect stdin to the last pipe
+                    dup2(pipes[i-1][0], 0);
+                }
+                if (i < number_cmds -1) { //if we're at the end of the commands, get the write end of the pipe to stdout
+                    dup2(pipes[i][1], 1);
+                }
+                for (int j = 0; j < number_cmds-1; ++j) { //close our pipes
+                    close(pipes[j][0]);
+                    close(pipes[j][1]);
+                }
+                if (execvp(args[0], args.data()) <0) { //execute the commands
+                    perror("Exec failed");
+                    exit(2);
+                }
+            } 
+            else {
+                child_pids.push_back(pid);
+            }
+        }
+        for (int j = 0; j < number_cmds-1; ++j) {
+            close(pipes[j][0]);
+            close(pipes[j][1]);
+        }
+        int status = 0;
+        for (pid_t pid : child_pids) {
+            waitpid(pid, &status, 0);
+        }
     }
-
 }
