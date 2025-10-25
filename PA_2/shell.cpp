@@ -20,7 +20,7 @@
 using namespace std;
 
 int main () {
-    // Get the old working directory 
+    // Get the old working directory
     char initial_pwd_buf[1024];
     string old_pwd;
     if (getcwd(initial_pwd_buf, sizeof(initial_pwd_buf)) != NULL) {
@@ -38,11 +38,11 @@ int main () {
         strftime(time_buf, sizeof(time_buf), "%b %d %H:%M:%S", ltm);
         string time_str = time_buf;
 
-        
+
         // Get the username
         struct passwd *pw = getpwuid(getuid());
         string username = (pw != NULL) ? pw->pw_name : "user";
-        
+
         // get the current directory
         char cwd_buf[1024]; // A buffer to hold the path
         string current_dir = (getcwd(cwd_buf, sizeof(cwd_buf)) != NULL) ? cwd_buf : "?";
@@ -50,12 +50,16 @@ int main () {
         // Print everything together
         // Format: [Date] [Username]:[Directory]$
         cout << time_str << " " << GREEN << username << NC << ":" << BLUE << current_dir << NC << "$ ";
-        
 
         // get user inputted command
         string input;
-        getline(cin, input);
-        
+        if (!getline(cin, input)) {
+            if (cin.eof()) { //exit the shell if reach eof of cin if getline input failed
+                cout << RED << "Now exiting shell..." << endl << "Goodbye" << NC << endl;
+                break;
+            }
+        }
+
         if (input == "exit") {  // print exit message and break out of infinite loop
             cout << RED << "Now exiting shell..." << endl << "Goodbye" << NC << endl;
             break;
@@ -66,7 +70,7 @@ int main () {
         size_t end_split = input.find("&&");
         while (end_split != string::npos) {
             split_ampersand.push_back(input.substr(start_split, end_split - start_split));
-            start_split = end_split + 2; 
+            start_split = end_split + 2;
             end_split = input.find("&&", start_split);
         }
         split_ampersand.push_back(input.substr(start_split));
@@ -77,22 +81,8 @@ int main () {
                 break;
             }
 
-            // specific fix for the -d issue
-            std::string fixed_cmd_set = cmd_set;
-            size_t pos = 0;
-            while ((pos = fixed_cmd_set.find("-d'", pos)) != std::string::npos) {
-                fixed_cmd_set.insert(pos + 2, " "); // insert space between -d and '
-                pos += 3; // move past inserted space
-            }
-            while ((pos = fixed_cmd_set.find("-d\"", pos)) != std::string::npos) {
-                fixed_cmd_set.insert(pos + 2, " "); // insert space between -d and "
-                pos += 3;
-            }
-            Tokenizer tknr(fixed_cmd_set);
 
-
-
-            //Tokenizer tknr(cmd_set); //tokenize the user input after it got split
+            Tokenizer tknr(cmd_set); //tokenize the user input after it got split
             if (tknr.hasError()) {  // continue to next prompt if input had an error
                 continue;
             }
@@ -102,14 +92,13 @@ int main () {
 
             if (tknr.commands.size() == 1 && tknr.commands[0]->args[0] == "cd") {//if we're only doing cd
                 string new_dir;
-                
                 // just cd, go home
-                if (tknr.commands[0]->args.size() < 2) { 
+                if (tknr.commands[0]->args.size() < 2) {
                     const char* home = getenv("HOME");
                     if (home) {
                         new_dir = home;
                     }
-                } 
+                }
                 // cd - go to previous working directory
                 else if (tknr.commands[0]->args[1] == "-") {
                     if (old_pwd.empty()) {
@@ -144,16 +133,14 @@ int main () {
                         prev_success = true; // Mark as success
                     }
                 }
-                
                 // 'cd' command is done, skip the forking/piping logic
-                continue; 
+                continue;
             }
             int number_cmds = tknr.commands.size();
             std::vector<pid_t> child_pids;
             pid_t prev_pid = -1;
 
             std::vector<int[2]> pipes(number_cmds - 1); // create a vector of pipes
-            
 
             for (int i = 0; i < number_cmds - 1; ++i) {
                 if (pipe(pipes[i]) < 0) {
@@ -167,7 +154,7 @@ int main () {
                     args.push_back(const_cast<char*>(s.c_str()));
                 }
                 args.push_back(nullptr); // add a nullptr to the end
-                
+
                 if (args.empty() || args[0] == nullptr) {
                     continue;
                 }
@@ -193,6 +180,8 @@ int main () {
                     }
 
                     auto& cmd = tknr.commands[i];
+
+                    //file redirection
                     if (cmd->hasInput()) {
                         int in_fd = open(cmd->in_file.c_str(), O_RDONLY);
                         if (in_fd < 0) {
@@ -217,13 +206,13 @@ int main () {
                         close(pipes[j][1]);
                     }
 
-                    
+
 
                     if (execvp(args[0], args.data()) <0) { //execute the commands
                         perror("Exec failed");
                         exit(2);
                     }
-                } 
+                }
                 else {
                     child_pids.push_back(pid);
                     prev_pid = pid;
@@ -247,6 +236,5 @@ int main () {
                 }
             }
         }
-        
     }
 }
