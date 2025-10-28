@@ -84,21 +84,23 @@ static void timerHandler( int sig, siginfo_t *si, void *uc )
 {
 	// Retrieve timer pointer from the si->si_value
     Step* comp_item = (Step*)si->si_value.sival_ptr;
+	comp_item->PrintComplete(); //print as complete
+	completedSteps->push_back(comp_item->id); //add the finished step to the vector
+	completeCount++; //incrememnt the completed signals
+	raise(SIGUSR1); //trigger the signal
 
-	/* TODO This Section - 2 */
-	// Officially complete the step using completedSteps and completeCount
-
-	// Ready to remove that dependency, call the trigger for the appropriate handler
-	/* End Section - 2 */
 }
 
 // Removes the copmleted steps from the dependency list of the step list.
 // Utilize the completedSteps vector and the RemoveDependency method.
 // To Complete - Section 3
 void RemoveDepHandler(int sig) {
-	/* TODO This Section - 3 */
-	// Foreach step that has been completed since last run, remove it as a dependency
-	/* End Section - 3 */
+
+	for (int stepID : *completedSteps) {
+		recipeSteps->RemoveDependency(stepID); //for every stepID inside of completedSteps, remove its dependency
+	}
+	completedSteps->clear(); //clear the completed steps
+
 }
 
 // Associate the signals to the signal handlers as appropriate
@@ -111,7 +113,7 @@ int main(int argc, char **argv)
 	if(input_file.empty()) {
 		exit(1);
 	}
-	
+
 	// Initialize global variables
 	completedSteps = new vector<int>();
 	recipeSteps = new StepList(input_file);
@@ -122,12 +124,18 @@ int main(int argc, char **argv)
     sa.sa_sigaction = timerHandler;
     sigemptyset(&sa.sa_mask);
 
-	/* TODO This Section - 1 */
-	// Associate the signal SIGRTMIN with the sa using the sigaction function
-	// Associate the appropriate handler with the SIGUSR1 signal, for removing dependencies
-	
-	// Until all steps have been completed, check if steps are ready to be run and create a timer for them if so
-	/* End Section - 1 */
+	sigaction(SIGRTMIN, &sa, NULL);
+	signal(SIGUSR1, RemoveDepHandler);
+	int totalSteps = recipeSteps->Count(); //give a loop condition to complete all steps
+	while (completeCount < totalSteps) { //while the completed steps is less than the total amount of steps...
+		vector<Step*> readySteps = recipeSteps->GetReadySteps(); //provide ready steps
+		for (Step* step : readySteps) { //for each step inside of ready steps
+			step->running = true; //set the step to true
+			makeTimer(step, step->duration);
+		}
+		pause();
+	}
+
 
 	cout << "Enjoy!" << endl;
 }
