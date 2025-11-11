@@ -2,6 +2,7 @@
 #include <mutex>
 #include <iostream>
 
+
 Task::Task() = default;
 Task::~Task() = default;
 
@@ -24,61 +25,72 @@ ThreadPool::~ThreadPool() {
 }
 
 void ThreadPool::SubmitTask(const std::string &name, Task *task) {
-    //TODO: Add task to queue, make sure to lock the queue
-    mtx.lock();
-    task->name = name;
-    queue.push_back(task);
-    num_tasks_unserviced++;
-    mtx.unlock();
+    std::lock_guard<std::mutex> lock(mtx); 
+    if (done) { //if the task was already completed, we can't submit it to the queue
+        std::cerr << "Cannot added task to queue\n";
+        return;
+    }
+    task->name = name; //set the name of the task as the passed in one
+    queue.push_back(task); //add it to the queue
+    std::cout << "Added task " << name <<"\n"; 
+    num_tasks_unserviced++; //increment counter
 }
 
 void ThreadPool::run_thread() {
     while (true) {
-        Task* next_task = nullptr;
+        Task* next_task = nullptr; //temp next task
+       
         {
-            mtx.lock();
-            //TODO1: if done and no tasks left, break
-            if (done && queue.empty()) {
-                mtx.unlock();
+            std::lock_guard<std::mutex> lock(mtx);
+            if (done && queue.empty()) { //if we're done and the queue is empty just break
                 break;
             }
-            //TODO2: if no tasks left, continue
-            if (queue.empty()) {
-                mtx.unlock();
-                continue; 
+            if (queue.empty()) { //if the queue is empty, we just move on
+                continue;
+            } else { //if it isn't we take off the front of the queue and set it equal to our next task and set its running status to true
+                next_task = queue.front();
+                queue.erase(queue.begin());
+                next_task->running = true;
             }
-            next_task = queue.front();
-            queue.erase(queue.begin());
-            next_task->running = true;
-            mtx.unlock();
         }
-        //TODO3: get task from queue, remove it from queue, and run it
+
+        std::cout << "Started task " << next_task->name << "\n";
         next_task->Run();
+        {
+            std::lock_guard<std::mutex> lock(mtx);
+            if (num_tasks_unserviced > 0) {
+                --num_tasks_unserviced;
+            }
+        }
+        std::cout << "Finished task " << next_task->name << "\n";
         next_task->running = false;
-        //TODO4: delete task
-        delete next_task;
+        delete next_task; //delete our temp task
     }
 }
 
-// Remove Task t from queue if it's there
 void ThreadPool::remove_task(Task *t) {
-    mtx.lock();
-    for (auto it = queue.begin(); it != queue.end();) {
+    std::lock_guard<std::mutex> lock(mtx);
+    for (auto it = queue.begin(); it != queue.end();) { 
         if (*it == t) {
+            delete *it;
             queue.erase(it);
-            num_tasks_unserviced--;
-            mtx.unlock();
+            if (num_tasks_unserviced > 0) --num_tasks_unserviced;
             return;
         }
         ++it;
     }
-    mtx.unlock();
 }
 
 void ThreadPool::Stop() {
-    //TODO: Delete threads, but remember to wait for them to finish first
-    done = true;
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        done = true; 
+    }
+    std::cout << "Called Stop()\n";
     for (std::thread *t: threads) {
-        t->join();
+        std::cout << "Stopping threads\n";
+        if (t && t->joinable()) {
+            t->join(); //join the threads if they are joinable
+        }
     }
 }
