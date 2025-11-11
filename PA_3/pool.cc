@@ -25,19 +25,38 @@ ThreadPool::~ThreadPool() {
 
 void ThreadPool::SubmitTask(const std::string &name, Task *task) {
     //TODO: Add task to queue, make sure to lock the queue
+    mtx.lock();
+    task->name = name;
+    queue.push_back(task);
+    num_tasks_unserviced++;
+    mtx.unlock();
 }
 
 void ThreadPool::run_thread() {
     while (true) {
-
-        //TODO1: if done and no tasks left, break
-
-        //TODO2: if no tasks left, continue
-
-       
+        Task* next_task = nullptr;
+        {
+            mtx.lock();
+            //TODO1: if done and no tasks left, break
+            if (done && queue.empty()) {
+                mtx.unlock();
+                break;
+            }
+            //TODO2: if no tasks left, continue
+            if (queue.empty()) {
+                mtx.unlock();
+                continue; 
+            }
+            next_task = queue.front();
+            queue.erase(queue.begin());
+            next_task->running = true;
+            mtx.unlock();
+        }
         //TODO3: get task from queue, remove it from queue, and run it
-
+        next_task->Run();
+        next_task->running = false;
         //TODO4: delete task
+        delete next_task;
     }
 }
 
@@ -47,6 +66,7 @@ void ThreadPool::remove_task(Task *t) {
     for (auto it = queue.begin(); it != queue.end();) {
         if (*it == t) {
             queue.erase(it);
+            num_tasks_unserviced--;
             mtx.unlock();
             return;
         }
@@ -57,4 +77,8 @@ void ThreadPool::remove_task(Task *t) {
 
 void ThreadPool::Stop() {
     //TODO: Delete threads, but remember to wait for them to finish first
+    done = true;
+    for (std::thread *t: threads) {
+        t->join();
+    }
 }
