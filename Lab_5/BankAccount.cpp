@@ -4,7 +4,7 @@
 void BankAccount::perform_threadsafe_transaction(const int64_t amount)
 {
         // TODO #6: LOCK other threads from using transaction() at the same time
-        //std::lock_guard<std::mutex> lock(m); 
+       
         m.lock();
 
         perform_transaction(amount);

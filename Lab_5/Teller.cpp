@@ -91,8 +91,8 @@ int main(int argc, char* argv[])
         std::vector<std::thread> t_vec2;
         const timepoint          start3 = std::chrono::steady_clock::now();
         // TODO #4: create *num_trans* threads and push_back() each one to t_vec2
-        for (size_t i = 0; i < num_trans; i++) {
-                t_vec2.push_back(std::thread(teller_thread, &C, trans_arr[i]));
+        for (size_t i = 0; i < num_trans; i++) { //loop through all transactions and add to the vector
+                t_vec2.push_back(std::thread(teller_threadsafe, &C, trans_arr[i]));
         }
         // TODO #5: join all threads in t_vec2
         for (std::thread& t: t_vec2) t.join();
